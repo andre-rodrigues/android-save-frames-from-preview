@@ -1,11 +1,9 @@
 package com.example.getpreviewframe;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewGroup.LayoutParams;
 
@@ -23,7 +21,7 @@ public class MainActivity extends Activity {
 		
 		mCamera = Camera.open();
 		Parameters params = mCamera.getParameters();
-		params.setPreviewFpsRange(29000, 29000);
+		params.setPreviewFpsRange(15000, 15000);
 		mCamera.setParameters(params);
 		
 		mPreview = new Preview(this, mCamera);
@@ -45,6 +43,7 @@ public class MainActivity extends Activity {
 		
 		if (mCamera != null) {
 			mCamera.stopPreview();
+			mPreview.setEndTime(System.currentTimeMillis());
 			mCamera.release();
 		}
 	}

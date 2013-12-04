@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
@@ -19,20 +20,53 @@ import android.view.SurfaceView;
 public class Preview extends SurfaceView implements SurfaceHolder.Callback, Camera.PreviewCallback {
 	private Camera mCamera;
 	private SurfaceHolder mHolder;
-	private Context context;
+	private String framesDir;
+    private int width;
+    private int height;
+    private int framesCount = 0;
+    private long initialTime = 0;
+    private long endTime = 0;
+    
+    public Preview(Context context, Camera camera) {
+    	super(context);
+    	this.mCamera = camera;
+    	
+    	initialTime = System.currentTimeMillis(); 
+    	
+    	Parameters p = camera.getParameters();
+    	this.width = p.getPreviewSize().width;
+    	this.height = p.getPreviewSize().height;
+    	
+    	// Install a SurfaceHolder.Callback so we get notified when the
+    	// underlying surface is created and destroyed.
+    	mHolder = getHolder();
+    	mHolder.addCallback(this);
+    	// deprecated setting, but required on Android versions prior to 3.0
+    	mHolder.setType(SurfaceHolder.SURFACE_TYPE_NORMAL);
+    	
+    	framesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES) + "/frames";
+    	File path = new File(framesDir);
+    	if (!path.exists()) {
+    		path.mkdirs();
+    	}
+    }
 
-	public Preview(Context context, Camera camera) {
-		super(context);
-		this.context = context;
-		this.mCamera = camera;
-		
-		// Install a SurfaceHolder.Callback so we get notified when the
-        // underlying surface is created and destroyed.
-        mHolder = getHolder();
-        mHolder.addCallback(this);
-        // deprecated setting, but required on Android versions prior to 3.0
-        mHolder.setType(SurfaceHolder.SURFACE_TYPE_NORMAL);
+	public long getInitialTime() {
+		return initialTime;
 	}
+
+	public void setInitialTime(long initialTime) {
+		this.initialTime = initialTime;
+	}
+
+	public long getEndTime() {
+		return endTime;
+	}
+
+	public void setEndTime(long endTime) {
+		this.endTime = endTime;
+	}
+
 
 	@Override
 	public void surfaceChanged(SurfaceHolder holder, int format, int width,	int height) {
@@ -58,6 +92,7 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, Came
         try {
             mCamera.setPreviewDisplay(mHolder);
             mCamera.startPreview();
+            initialTime = System.currentTimeMillis();
             mCamera.setPreviewCallback(this);
 
         } catch (Exception e){
@@ -66,12 +101,14 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, Came
 		
 	}
 
+	@SuppressLint("NewApi")
 	@Override
 	public void surfaceCreated(SurfaceHolder holder) {
 		// The Surface has been created, now tell the camera where to draw the preview.
         try {
             mCamera.setPreviewDisplay(holder);
             mCamera.startPreview();
+            initialTime = System.currentTimeMillis();
             mCamera.setPreviewCallback(this);
         } catch (IOException e) {
             Log.d("Preview", "Error setting camera preview: " + e.getMessage());
@@ -87,25 +124,28 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback, Came
 
 	@Override
     public void onPreviewFrame(byte[] data, Camera camera) {
-        Parameters p = camera.getParameters();
-        int width = p.getPreviewSize().width;
-        int height = p.getPreviewSize().height;
-
         ByteArrayOutputStream outstr = new ByteArrayOutputStream();
-        Rect rect = new Rect(0, 0, width, height);
         YuvImage yuvimage = new YuvImage(data, ImageFormat.NV21, width, height, null);
         
         // outstr contains image in jpeg
-        yuvimage.compressToJpeg(rect, 80, outstr);
-
-    	File photo = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES) + "/frames/photo.jpeg");
+        Rect rect = new Rect(0, 0, width, height);
+        yuvimage.compressToJpeg(rect, 25, outstr);
+        
+        framesCount++;
+    	File frame = new File(framesDir + "/frame-" + String.format("%03d", framesCount) + ".jpeg");
 		try {
-			FileOutputStream fos=new FileOutputStream(photo.getPath());
+			FileOutputStream fos = new FileOutputStream(frame.getPath());
 			outstr.writeTo(fos);
 			
 			fos.close();
 		} catch (java.io.IOException e) {
-			Log.e("PictureDemo", "Exception in photoCallback", e);
+			Log.e("Preview frame", "Can't save frame", e);
 		}
     }
+	
+	public float getPreviewFps() {
+		long end = (endTime == 0) ? System.currentTimeMillis() : endTime;
+		float spentSeconds = (end - initialTime) / 1000;
+		return framesCount / spentSeconds;
+	}
 }
